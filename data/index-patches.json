@@ -1,0 +1,10 @@
+{
+    "system:access": {
+        "version": 1.0,
+        "indexes":[
+            { "id": 1 },
+            { "role": 1, "service": 1, "bean": 1, "action": 1, "version": 1, "allow": 1 },
+            { "role": 1, "service": 1, "version": 1 }
+        ]
+    }
+}
