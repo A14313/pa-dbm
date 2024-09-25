@@ -104,22 +104,22 @@ export class DBService {
         console.log('connecting to azure vault');
         let keyVaultName = process.env["COM_AZURE_KEYVAULTNAME"];
         let url = `https://${keyVaultName}.vault.azure.net`;
-        let credential = new DefaultAzureCredential();        
+        let credential = new DefaultAzureCredential();
         let client = new SecretClient(url, credential);
 
-        client.getSecret(process.env["AZURE_CONN_STR"]).then((secret)=>{
+        client.getSecret(process.env["AZURE_CONN_STR"]).then((secret) => {
             DBService.CONNECTION_STR = secret.value;
-            client.getSecret(process.env["AZURE_KEY_NAME"]).then((secret)=>{
+            client.getSecret(process.env["AZURE_KEY_NAME"]).then((secret) => {
                 DBService.ENCRYPTION_KEY = secret.value;
-                cb({success:true});
-            }).catch((e)=>{
-                cb({success:false});
+                cb({ success: true });
+            }).catch((e) => {
+                cb({ success: false });
                 console.log(e);
             });
-        }).catch((e)=>{
-            cb({success:false});
+        }).catch((e) => {
+            cb({ success: false });
             console.log(e);
-        });    
+        });
     }
 
     public static connect(version: string, cb: Function) {
@@ -700,7 +700,7 @@ export class DBService {
                 let key = Buffer.from(DBService.ENCRYPTION_KEY, 'base64');
                 let algorithm = DBService.ENCRYPTION_ALGORITHM;
                 let iv_length = DBService.ENCRYPTION_IV_LENGTH;
-                
+
                 let iv = chunk.slice(0, iv_length);
                 let decoded = chunk.slice(iv_length, chunk.length);
                 let decipher = crypto.createDecipheriv(algorithm, key, iv);
@@ -919,10 +919,28 @@ export class DBService {
             this.hashPathsAndRemove(data, validation.options.forEncryption);
         }
 
-        type = namespace + ':' + this.modelNames[type];
-        let scope = this;
-        data._type = type;
+        if (model.external) {
+            type = this.modelNames[type];
+        }
+        else {
+            type = namespace + ':' + this.modelNames[type];
+        }
 
+        let scope = this;
+
+        console.log("searchData:", data);
+
+        if (model.external) {
+            if (data.hasOwnProperty("_type")) {
+                delete data._type;
+            }
+        }
+        else {
+            data._type = type;
+        }
+
+        console.log("========= searchProps:", props);
+        console.log("========= searchFilter:", filter);
         if (filter && Array.isArray(filter)) {
             let ors: any = [];
             for (let i = 0; i < filter.length; i++) {
@@ -981,6 +999,8 @@ export class DBService {
                     }
                 }
             }
+
+            console.log("========= searchORS:", ors);
             if (ors.length > 0) {
                 if (mode == 'and') {
                     data['$and'] = ors;
@@ -996,7 +1016,7 @@ export class DBService {
                 "$match": data
             }
         ];
-        let missingTags:any = [];
+        let missingTags: any = [];
         if (populate) {
 
             let buildPopulate: Function = (list: any, targetType: string, pipe: any, level: number) => {
@@ -1122,13 +1142,15 @@ export class DBService {
         }
 
         let collection = scope.db.collection(type);
-        
+
         if (model.external) {
-            collection = scope.client.db(model.sibling).collection(model.namespace + ':' + this.modelNames[otype])
+            collection = scope.client.db(model.sibling).collection(this.modelNames[otype]);
+            //collection = scope.client.db(model.sibling).collection(model.namespace + ':' + this.modelNames[otype])
         }
         if (populate || group) {
             cursor = collection.aggregate(pipeline);
         } else {
+            console.log("==============  findData:", data);
             cursor = collection.find(data);
         }
 
